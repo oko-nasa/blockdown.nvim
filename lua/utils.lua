@@ -1,11 +1,12 @@
-local function BuildArray(...)
-    local arr = {}
-    for v in ... do
-        arr[#arr + 1] = v
+
+local function checkerError(cond, err)
+    if cond then
+        print(err)
     end
-    return arr
+    return cond
 end
 
+
 return {
-    buildArray = BuildArray,
+    checkerError = checkerError,
 }

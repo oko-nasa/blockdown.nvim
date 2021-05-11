@@ -6,31 +6,30 @@ perfectSquares = aux []
             | otherwise = lst
 
 main = do
-    print $ perfectSquares 5
+    print $ perfectSquares 35
 ```
 
 
-```python repl
-N = 5
-for n in map(lambda n : n*n, range(1,N)):
-    print(n)
+```python repl ipy
+print("haha")
+print("haha")
+print("haha")
+print("haha")
 
 ```
 
 
-```rust repl
+```rust
 fn main() {
-    let x = 0;
     println!("Hello world!");
 }
 ```
 
 
+[DUMP]: ./
 ``` c
 #include <stdio.h>
-
 #define N 5
-
 int main() {
     for(int i = 0; i < N; i++)
         printf("%i ", i*i);
@@ -38,7 +37,7 @@ int main() {
 }
 ```
 
-``` bash repl
+``` bash repl uca
 echo "hi"
-echo "hello"
+echo "hello2"
 ```
