@@ -1,9 +1,6 @@
-
 cache = "/tmp/blockdown/"
 
-if vim.fn.finddir(cache) == nil then
-    vim.fn.mkdir(cache)
-end
+if vim.fn.finddir(cache) == "" then vim.fn.mkdir(cache) end
 
 
 local setup = {
@@ -22,12 +19,20 @@ local setup = {
         haskell = function(fpath) return "runhaskell "..fpath..".haskell" end,
     };
 
+    interpreter = (function(runner)
+        vim.api.nvim_command(":FloatermNew "..runner)
+    end);
 
+    repl = (function(i, e)
+        for n = i,e,1 do
+            vim.api.nvim_command(":FloatermSend "..vim.fn.getline(n))
+        end
+    end);
 }
 
 local block_pattern = vim.regex("^```")
 
-local function find_block()
+local function FindBlock()
     local start_line = vim.fn.line(".")-1
     local end_line = start_line
     local final_line = vim.fn.line("$")-1
@@ -68,23 +73,30 @@ end
 --     return args
 -- end
 
-local function run_block()
-    local i,e = find_block()
+local function RunBlock()
+    local i,e = FindBlock()
 
-    if i ~= nil then
-        local lang = vim.api.nvim_exec("echo getline("..i..")[3:]", true):gsub("^[ ]+", ""):gsub("[ ]+$", "")
-        i = i+1; e = e-1
-        local fpath = cache..i.."to"..e..vim.fn.expand("%:r")
-
-        vim.api.nvim_command("silent! " .. i .. "," .. e .. "w! " .. fpath.."."..lang)
-        vim.api.nvim_command(":FloatermNew " .. setup.langs[lang](fpath))
-    else
+    if i == nil then
         print("ERROR: no block found.")
+        return
+    end
+
+    local lang = vim.api.nvim_exec("echo getline("..i..")[3:]", true):gsub("^[ ]+", ""):gsub("[ ]+$", "")
+    i = i+1; e = e-1
+
+    if lang:match(" repl$") ~= nil then
+        setup.repl(i,e)
+    elseif setup.langs[lang] ~= nil then
+        local fpath = cache..i.."to"..e..vim.fn.expand("%:r")
+        vim.api.nvim_command("silent! " .. i .. "," .. e .. "w! " .. fpath.."."..lang)
+        setup.interpreter(setup.langs[lang](fpath))
+    else
+        print("ERROR: interpreter for '"..lang.."' not found.")
     end
 end
 
 
 return {
     setup = setup,
-    run = run_block,
+    run = RunBlock,
 }
