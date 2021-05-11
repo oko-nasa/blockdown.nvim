@@ -10,14 +10,17 @@ main = do
 ```
 
 
-```python
+```python repl
 N = 5
 for n in map(lambda n : n*n, range(1,N)):
     print(n)
+
 ```
 
-```rust
+
+```rust repl
 fn main() {
+    let x = 0;
     println!("Hello world!");
 }
 ```
@@ -35,6 +38,7 @@ int main() {
 }
 ```
 
-``` sql repl
-select * from ventas;
+``` bash repl
+echo "hi"
+echo "hello"
 ```

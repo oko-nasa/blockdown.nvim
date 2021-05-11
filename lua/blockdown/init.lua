@@ -4,6 +4,7 @@ if vim.fn.finddir(cache) == "" then vim.fn.mkdir(cache) end
 
 
 local setup = {
+
     langs = {
         python = function(fpath) return "python "..fpath..".python" end,
         lua = function(fpath) return "lua "..fpath..".lua" end,
@@ -12,10 +13,10 @@ local setup = {
         scala = function(fpath) return "scala "..fpath..".scala" end,
         bash = function(fpath) return "bash "..fpath..".bash" end,
         javascript = function(fpath) return "node "..fpath..".javascript" end,
-        c = function(fpath) return "gcc "..fpath..".c -o "..fpath.." && "..fpath end,
-        cpp = function(fpath) return "g++ "..fpath..".cpp -o "..fpath.." && "..fpath end,
+        c = function(fpath) return "gcc "..fpath..".c -o "..fpath..".cout && "..fpath..".cout" end,
+        cpp = function(fpath) return "g++ "..fpath..".cpp -o "..fpath..".cppout && "..fpath..".cppout" end,
         go = function(fpath) return "go "..fpath..".go" end,
-        rust = function(fpath) return "rustc -o "..fpath.." "..fpath..".rust && "..fpath end,
+        rust = function(fpath) return "rustc -o "..fpath..".rsout "..fpath..".rust && "..fpath..".rsout" end,
         haskell = function(fpath) return "runhaskell "..fpath..".haskell" end,
     };
 
@@ -25,7 +26,7 @@ local setup = {
 
     repl = (function(i, e)
         for n = i,e,1 do
-            vim.api.nvim_command(":FloatermSend "..vim.fn.getline(n))
+            vim.api.nvim_command(":"..n.."FloatermSend")
         end
     end);
 }
@@ -46,7 +47,6 @@ local function FindBlock()
     if start_line < 0 then return nil end
 
     if start_line == end_line then end_line = end_line+1 end
-
     while end_line <= final_line do
         if block_pattern:match_line(0, end_line) == nil
             then end_line = end_line + 1
@@ -86,10 +86,12 @@ local function RunBlock()
 
     if lang:match(" repl$") ~= nil then
         setup.repl(i,e)
+
     elseif setup.langs[lang] ~= nil then
-        local fpath = cache..i.."to"..e..vim.fn.expand("%:r")
+        local fpath = cache..vim.fn.expand("%:r")
         vim.api.nvim_command("silent! " .. i .. "," .. e .. "w! " .. fpath.."."..lang)
         setup.interpreter(setup.langs[lang](fpath))
+
     else
         print("ERROR: interpreter for '"..lang.."' not found.")
     end
