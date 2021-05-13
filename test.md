@@ -4,40 +4,33 @@ perfectSquares = aux []
     where aux lst n
             | n > 0 = aux ((n*n):lst) (n-1)
             | otherwise = lst
-
 main = do
     print $ perfectSquares 35
 ```
 
-
-```python repl ipy
-print("haha")
-print("haha")
-print("haha")
-print("haha")
-
+```python repl
+print("hello")
+print("hello")
+print("hello")
+print("hello")
 ```
 
-
-```rust
+```rust 0.2
 fn main() {
-    println!("Hello world!");
+    println!("Hola desde 0.2!");
 }
 ```
-
 
 [DUMP]: ./
+[NAME]: ej1c
 ``` c
 #include <stdio.h>
-#define N 5
 int main() {
-    for(int i = 0; i < N; i++)
-        printf("%i ", i*i);
-    printf("\n");
+    printf("Hola desde 0.1!\n");
 }
 ```
 
-``` bash repl uca
+``` bash repl
 echo "hi"
 echo "hello2"
 ```

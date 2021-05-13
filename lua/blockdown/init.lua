@@ -1,11 +1,19 @@
-local U = require"utils"
 local cache = "/tmp/blockdown/"
-
 if vim.fn.finddir(cache) == "" then vim.fn.mkdir(cache) end
+
+local U = require"utils"
+local cmd = vim.api.nvim_command
+
 
 
 local _setup = {
-    langs = {
+
+    runner = {
+        _func = (function(runner, _target)
+            local target = _target ~= nil and _target or "0.1"
+            vim.api.nvim_command(":silent !tmux send-keys -t "..target..' "'..U.keystrokes(runner)..'" ENTER')
+        end);
+
         python = function(fpath,args) return "python "..fpath..".python "..args end,
         lua = function(fpath,args) return "lua "..fpath..".lua "..args end,
         php = function(fpath,args) return "php "..fpath..".php "..args end,
@@ -20,12 +28,15 @@ local _setup = {
         haskell = function(fpath,args) return "runhaskell "..fpath..".haskell "..args end,
     };
 
-    interpreter = (function(runner) vim.api.nvim_command(":FloatermNew "..runner) end);
+    repl = (function(i, e)
+        for n = i,e,1 do cmd([[silent !tmux send-keys -t 0.1 "]]..U.keystrokes(vim.fn.getline(n))..[[" ENTER]]) end
+    end);
 
-    repl = (function(i, e, name) for n = i,e,1 do vim.api.nvim_command(":"..n.."FloatermSend"..(name~=nil and (" --name="..name) or "")) end end);
 }
 
-
+--[[
+    FindBlock() catches the lines which delimit a codeblock.
+--]]
 local block_pattern = vim.regex("^```")
 local function FindBlock()
     local start_line = vim.fn.line(".")-1
@@ -53,58 +64,66 @@ local function FindBlock()
 end
 
 
+--[[
+    GetArgsBlock(i) fetches all [ARGS]: starting from i upwards.
+--]]
 local function GetArgsBlock(i)
     local ret = {}
 
-    local _,_,k,v = string.find(vim.fn.getline(i), "^%[(.+)%]:(.+)")
+    local _,_,k,v = vim.fn.getline(i):find("^%[(.+)%]:(.*)")
     while v ~= nil and i > 0 do
-        ret[#ret+1] = {k:gsub("^%s+", ""):gsub("%s+$", ""),v:gsub("^%s+", ""):gsub("%s+$", "")}
+        ret[#ret+1] = {U.trim(k), U.trim(v)}
         i = i-1
-        _,_,k,v = string.find(vim.fn.getline(i), "^%[(.+)%]:(.+)")
+        _,_,k,v = vim.fn.getline(i):find("^%[(.+)%]:(.*)")
     end
 
     return ret
 end
 
 
-local function RunRepl(i,e,lang,name,args)
+--[[
+    GetArgsBlock(i) fetches all [ARGS]: starting from i upwards.
+--]]
+local function RunInterpreter(i,e,lang,head,args)
+    local defargs = {
+        path = cache,
+        fargs = "",
+        precmds = {},
+        postcmds = {}
+    }
 
-    -- for pi = 1,#args do
-    --     arg = args[#args+1-pi]
-    --     if arg[1] == "REPL" then
-    --         return
-    --     else
-    --         print("ERROR: '"..arg[1].."' doesn't exist as a possible argument for executable blocks.")
-    --         return
-    --     end
-    -- end
-
-    print(name)
-    if name ~= nil then
-        vim.api.nvim_command(":FloatermNew --name="..name.." python")
-    end
-    _setup.repl(i, e, name)
-end
-
-local function RunInterpreter(i,e,lang,args)
-    local path = cache
-    local fargs = ""
-
-    for pi = 1,#args do
-        arg = args[#args+1-pi]
+    for _,arg in U.revpairs(args) do
         if arg[1] == "DUMP" then
-            path = arg[2]
+            defargs.path = arg[2]
+
         elseif arg[1] == "ARGS" then
-            fargs = fargs.." "..arg[2]
+            defargs.fargs = defargs.fargs.." "..arg[2]
+
+        elseif arg[1] == "CLEAR" and defargs.clear == nil then
+            defargs.clear = "clear && "
+
+        elseif arg[1] == "NAME" then
+            defargs.name = arg[2]
+
+        elseif arg[1] == "PRE" or arg[1] == "POST" then
+            local key = arg[1]:lower().."cmds"
+            defargs[key][#(defargs[key])+1] = arg[2]
+
         else
             print("ERROR: '"..arg[1].."' doesn't exist as a possible argument for executable blocks.")
             return
         end
     end
 
-    local fpath = path..vim.fn.expand("%:r")
+    local fpath = defargs.path..(defargs.name ~= nil and defargs.name:gsub(" ", "_") or vim.fn.expand("%:r"))
+    local tmux_cmd = function(keystrokes) vim.api.nvim_command("silent! !tmux send-keys -t"..(head ~= nil and head or "0.1")..' "'..U.keystrokes(keystrokes)..'" ENTER') end
+
     vim.api.nvim_command("silent! " .. i .. "," .. e .. "w! " .. fpath.."."..lang)
-    _setup.interpreter(_setup.langs[lang](fpath,fargs))
+    if defargs.clear ~= nil then tmux_cmd("clear") end
+
+    for _,precmd in ipairs(defargs.precmds) do tmux_cmd(precmd) end
+    _setup.runner._func(_setup.runner[lang](fpath,defargs.fargs), head)
+    for _,postcmd in ipairs(defargs.postcmds) do tmux_cmd(postcmd) end
 end
 
 
@@ -116,21 +135,19 @@ local function RunBlock()
 
     local lang = vim.api.nvim_exec("echo getline("..i..")[3:]", true):gsub("^%s+", ""):gsub("%s+$", "")
     local blockhead = {}
-    lang:gsub("%w+", function(c) table.insert(blockhead,c) end)
+    lang:gsub("[%S]+", function(c) table.insert(blockhead,c) end)
 
     if U.checkerError(
-        not (blockhead[2] ~= nil and blockhead[2] == "repl" or _setup.langs[lang] ~= nil),
+        not (blockhead[2] ~= nil and blockhead[2] == "repl" or blockhead[1] ~= "_func" and _setup.runner[blockhead[1]] ~= nil),
         "ERROR: interpreter for '"..lang.."' not found.") then return end
 
     i = i+1; e = e-1
     local execargs = GetArgsBlock(i-2)
 
     if blockhead[2] ~= nil and blockhead[2] == "repl" then
-        RunRepl(i,e, blockhead[1], blockhead[3], execargs)
-
-    elseif _setup.langs[lang] ~= nil then
-        RunInterpreter(i, e, lang, execargs)
-
+        _setup.repl(i,e,blockhead[3])
+    else
+        RunInterpreter(i, e, blockhead[1], blockhead[2], execargs)
     end
 end
 
